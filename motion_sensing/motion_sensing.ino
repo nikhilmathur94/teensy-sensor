@@ -138,6 +138,15 @@
 #define MPU6050_WHO_AM_I           0x75   // R
 
 
+//MPU9150 Compass
+#define MPU9150_CMPS_XOUT_L        0x4A   // R
+#define MPU9150_CMPS_XOUT_H        0x4B   // R
+#define MPU9150_CMPS_YOUT_L        0x4C   // R
+#define MPU9150_CMPS_YOUT_H        0x4D   // R
+#define MPU9150_CMPS_ZOUT_L        0x4E   // R
+#define MPU9150_CMPS_ZOUT_H        0x4F   // R
+
+
 // Defines for the bits, to be able to change 
 // between bit number and binary definition.
 // By using the bit number, programming the sensor 
@@ -621,10 +630,10 @@
 // But only if the AD0 pin is low.
 // Some sensor boards have AD0 high, and the
 // I2C address thus becomes 0x69.
-#define MPU6050_I2C_ADDRESS 0x68
+int MPU6050_I2C_ADDRESS = 0x68;
 
 
-// Declaring an union for the registers and the axis values.
+// Declaring a union for the registers and the axis values.
 // The byte order does not match the byte order of 
 // the compiler and AVR chip.
 // The AVR chip (on the Arduino board) has the Low Byte 
@@ -665,7 +674,28 @@ typedef union accel_t_gyro_union
 };
 
 
+typedef union cmps_union
+{
+  struct
+  {
+    uint8_t x_cmps_l;
+    uint8_t x_cmps_h;
+    uint8_t y_cmps_l;
+    uint8_t y_cmps_h;
+    uint8_t z_cmps_l;
+    uint8_t z_cmps_h;
+  } reg;
+  struct
+  {
+    int16_t x_cmps;
+    int16_t y_cmps;
+    int16_t z_cmps;
+  } value;
+};
+
+
 File myFile;
+File dataLog;
 
 void setup()
 {      
@@ -673,7 +703,7 @@ void setup()
   uint8_t c;
   
 
-  Serial.begin(9600);
+  Serial.begin(36000);
   Serial.println(F("InvenSense MPU-6050"));
   Serial.println("");
 
@@ -703,8 +733,8 @@ void setup()
   }
   
   myFile.close();
-
-
+  
+  
   // default at power-up:
   //    Gyro at 250 degrees second
   //    Acceleration at 2g
@@ -731,6 +761,8 @@ void setup()
 
   // Clear the 'sleep' bit to start the sensor.
   MPU6050_write_reg (MPU6050_PWR_MGMT_1, 0);
+  
+  MPU9150_setupCompass();
 }
 
 
@@ -739,6 +771,7 @@ void loop()
   int error;
   double dT;
   accel_t_gyro_union accel_t_gyro;
+  cmps_union cmps;
 
 
   Serial.println(F(""));
@@ -753,8 +786,12 @@ void loop()
   error = MPU6050_read (MPU6050_ACCEL_XOUT_H, (uint8_t *) &accel_t_gyro, sizeof(accel_t_gyro));
   Serial.print(F("Read accel, temp and gyro, error = "));
   Serial.println(error, DEC);
-
-
+  
+  error = MPU6050_read (MPU9150_CMPS_XOUT_L, (uint8_t *) &cmps, sizeof(cmps));
+  Serial.print(F("Read compass, error = "));
+  Serial.println(error, DEC);
+ 
+  
   // Swap all high and low bytes.
   // After this, the registers values are swapped, 
   // so the structure name like x_accel_l does no 
@@ -771,8 +808,17 @@ void loop()
   SWAP (accel_t_gyro.reg.z_gyro_h, accel_t_gyro.reg.z_gyro_l);
 
 
-  // Print the raw acceleration values
+  // Open the log file
+  dataLog = SD.open("data.log", FILE_WRITE);
+  if (dataLog){
+    Serial.println("writing to data log.."); 
+  }
+  else {
+    Serial.println("error opening data log.."); 
+  }
 
+
+  // Print the raw acceleration values
   Serial.print(F("accel x,y,z: "));
   Serial.print(accel_t_gyro.value.x_accel, DEC);
   Serial.print(F(", "));
@@ -781,7 +827,15 @@ void loop()
   Serial.print(accel_t_gyro.value.z_accel, DEC);
   Serial.println(F(""));
 
-
+  // Write them to log file
+  dataLog.write(accel_t_gyro.value.x_accel);
+  dataLog.write(' ');
+  dataLog.write(accel_t_gyro.value.y_accel);
+  dataLog.write(' ');
+  dataLog.write(accel_t_gyro.value.z_accel);
+  dataLog.write(' ');
+  
+  
   // The temperature sensor is -40 to +85 degrees Celsius.
   // It is a signed integer.
   // According to the datasheet: 
@@ -796,7 +850,6 @@ void loop()
 
 
   // Print the raw gyro values.
-
   Serial.print(F("gyro x,y,z : "));
   Serial.print(accel_t_gyro.value.x_gyro, DEC);
   Serial.print(F(", "));
@@ -805,7 +858,35 @@ void loop()
   Serial.print(accel_t_gyro.value.z_gyro, DEC);
   Serial.println(F(""));
 
-  delay(20);
+  // Write them to log file
+  dataLog.write(accel_t_gyro.value.x_gyro);
+  dataLog.write(' ');
+  dataLog.write(accel_t_gyro.value.y_gyro);
+  dataLog.write(' ');
+  dataLog.write(accel_t_gyro.value.z_gyro);
+  dataLog.write(' ');
+  
+  
+  // Print the raw magnetometer values
+  Serial.print(F("compass: "));
+  Serial.print(cmps.value.x_cmps);
+  Serial.print(F(", "));
+  Serial.print(cmps.value.y_cmps);
+  Serial.print(F(", "));
+  Serial.print(cmps.value.z_cmps);
+  Serial.println(F(""));
+  
+  // Write them to the log file
+  dataLog.write(cmps.value.x_cmps);
+  dataLog.write(' ');
+  dataLog.write(cmps.value.y_cmps);
+  dataLog.write(' ');
+  dataLog.write(cmps.value.z_cmps);
+  dataLog.write('\n');
+
+  dataLog.close();
+  
+  delay(33);
 }
 
 
@@ -888,6 +969,17 @@ int MPU6050_write(int start, const uint8_t *pData, int size)
   return (0);         // return : no error
 }
 
+//MPU9150 code
+int MPU9150_writeSensor(int addr,int data){
+  Wire.beginTransmission(MPU6050_I2C_ADDRESS);
+  Wire.write(addr);
+  Wire.write(data);
+  Wire.endTransmission(true);
+
+  return 1;
+}
+
+
 // --------------------------------------------------------
 // MPU6050_write_reg
 //
@@ -903,6 +995,37 @@ int MPU6050_write_reg(int reg, uint8_t data)
   error = MPU6050_write(reg, &data, 1);
 
   return (error);
+}
+
+
+//Thank you to pansenti for setup code.
+//I will documented this one later.
+void MPU9150_setupCompass(){
+  MPU6050_I2C_ADDRESS = 0x0C;      //change Adress to Compass
+
+  MPU9150_writeSensor(0x0A, 0x00); //PowerDownMode
+  MPU9150_writeSensor(0x0A, 0x0F); //SelfTest
+  MPU9150_writeSensor(0x0A, 0x00); //PowerDownMode
+
+  MPU6050_I2C_ADDRESS = 0x68;      //change Adress to MPU
+
+  MPU9150_writeSensor(0x24, 0x40); //Wait for Data at Slave0
+  MPU9150_writeSensor(0x25, 0x8C); //Set i2c address at slave0 at 0x0C
+  MPU9150_writeSensor(0x26, 0x02); //Set where reading at slave 0 starts
+  MPU9150_writeSensor(0x27, 0x88); //set offset at start reading and enable
+  MPU9150_writeSensor(0x28, 0x0C); //set i2c address at slv1 at 0x0C
+  MPU9150_writeSensor(0x29, 0x0A); //Set where reading at slave 1 starts
+  MPU9150_writeSensor(0x2A, 0x81); //Enable at set length to 1
+  MPU9150_writeSensor(0x64, 0x01); //overvride register
+  MPU9150_writeSensor(0x67, 0x03); //set delay rate
+  MPU9150_writeSensor(0x01, 0x80);
+
+  MPU9150_writeSensor(0x34, 0x04); //set i2c slv4 delay
+  MPU9150_writeSensor(0x64, 0x00); //override register
+  MPU9150_writeSensor(0x6A, 0x00); //clear usr setting
+  MPU9150_writeSensor(0x64, 0x01); //override register
+  MPU9150_writeSensor(0x6A, 0x20); //enable master i2c mode
+  MPU9150_writeSensor(0x34, 0x13); //disable slv4
 }
 
 

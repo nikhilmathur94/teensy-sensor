@@ -1,15 +1,13 @@
+// File: motion_sensing.ino
+// Author: Nikhil Mathur
+// Date: 6/24/15
+
+// Starter Code taken from Arduino MPU-6050 site:
+
 // MPU-6050 Accelerometer + Gyro
 // -----------------------------
 //
 // By arduino.cc user "Krodal".
-//
-// June 2012
-//      first version
-// July 2013 
-//      The 'int' in the union for the x,y,z
-//      changed into int16_t to be compatible
-//      with Arduino Due.
-//
 // Open Source / Public Domain
 //
 // Using Arduino 1.0.1
@@ -40,8 +38,7 @@
 #include <SD.h>
 
 // The name of the sensor is "MPU-6050".
-// For program code, I omit the '-', 
-// therefor I use the name "MPU6050....".
+// For program code, I omit the '-': "MPU6050".
 
 
 // Register names according to the datasheet.
@@ -51,7 +48,7 @@
 // at 0x02 ... 0x18, but according other information 
 // the registers in that unknown area are for gain 
 // and offsets.
-// 
+
 #define MPU6050_AUX_VDDIO          0x01   // R/W
 #define MPU6050_SMPLRT_DIV         0x19   // R/W
 #define MPU6050_CONFIG             0x1A   // R/W
@@ -674,38 +671,38 @@ void setup()
 {      
   int error;
   uint8_t c;
-
   
 
   Serial.begin(9600);
   Serial.println(F("InvenSense MPU-6050"));
-  Serial.println(F("June 2012"));
+  Serial.println("");
 
   // Initialize the 'Wire' class for the I2C-bus.
   Wire.begin();
   
   
-  // Initialize the SD card for data logging
-  //test
-  pinMode(PIN_B0, OUTPUT);
+  // Initialize the SD card for data logging w/ SPI-bus
+  pinMode(0, OUTPUT);
   
-  if (!SD.begin(PIN_B0)){
+  if (!SD.begin(0)){
     Serial.println("SD initialization failed..");
     //return;
   }
   else {
-    Serial.print("SD initialization done..");
+    Serial.println("SD initialization done!");
   }
   
   myFile = SD.open("test.txt", FILE_WRITE);
   
   if (myFile){
-    Serial.println("Writing to SD file..");
-    myFile.write("testing..");
+    Serial.println("Writing to SD file!");
+    myFile.write("testing..\n");
   }
   else{
     Serial.println("Error opening the file.."); 
   }
+  
+  myFile.close();
 
 
   // default at power-up:
@@ -717,9 +714,9 @@ void setup()
 
   error = MPU6050_read (MPU6050_WHO_AM_I, &c, 1);
   Serial.print(F("WHO_AM_I : "));
-  Serial.print(c,HEX);
+  Serial.print(c, HEX);
   Serial.print(F(", error = "));
-  Serial.println(error,DEC);
+  Serial.println(error, DEC);
 
   // According to the datasheet, the 'sleep' bit
   // should read a '1'.
@@ -755,7 +752,7 @@ void loop()
   // are not very stable.
   error = MPU6050_read (MPU6050_ACCEL_XOUT_H, (uint8_t *) &accel_t_gyro, sizeof(accel_t_gyro));
   Serial.print(F("Read accel, temp and gyro, error = "));
-  Serial.println(error,DEC);
+  Serial.println(error, DEC);
 
 
   // Swap all high and low bytes.
@@ -806,7 +803,6 @@ void loop()
   Serial.print(accel_t_gyro.value.y_gyro, DEC);
   Serial.print(F(", "));
   Serial.print(accel_t_gyro.value.z_gyro, DEC);
-  Serial.print(F(", "));
   Serial.println(F(""));
 
   delay(20);
